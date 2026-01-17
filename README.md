@@ -15,7 +15,7 @@
 ## 📚 Table of Contents
 
 - [What is Polars?](#what-is-polars)
-- [Functions](#functions)
+- [Feature](#functions)
   - [Expression API](#expression-api)
   - [Lazy Mode & Streaming](#lazy-mode--streaming)
 
@@ -23,15 +23,38 @@
 
 ## What is Polars?
 
-- A `dataframe` library with a Python API.
-- A tool for data ETL.
-- Work with multiple types of file, such as CSV, Excel spreadsheets, Parquet, and so on.
-- `Faster` than Pandas
-- With a **easier-to-read** code than other dataframe libraries.
+Polars is a **blazingly fast** DataFrame library designed for high-performance data manipulation and analysis.
+
+### Core Architecture
+
+- **Written in Rust** - Built entirely in Rust for memory safety, performance, and parallel execution
+- **Apache Arrow Columnar Format** - Uses Arrow's in-memory columnar data structure for:
+  - Cache-efficient operations
+  - Zero-copy data sharing with other Arrow-compatible tools (PyArrow, Spark, etc.)
+  - Vectorized operations using SIMD (Single Instruction, Multiple Data)
+
+### Key Features
+
+- **Multi-language API** - Python, Rust, Node.js, and R bindings
+- **Lightning Fast** - Often 5-10x faster than Pandas due to Rust core and columnar memory
+- **Lazy Evaluation** - Query optimization similar to SQL databases
+- **Out-of-Core Processing** - Handle datasets larger than RAM with streaming engine
+- **Rich File Format Support** - CSV, Parquet, JSON, Excel, Arrow IPC, and more
+- **Expressive API** - Clean, declarative syntax for complex data transformations
+
+### Why Polars?
+
+| Feature | Polars | Pandas |
+| ------- | ------ | ------ |
+| **Speed** | ⚡ 5-10x faster | Baseline |
+| **Memory** | 🔋 More efficient (columnar) | Row-based |
+| **Parallelization** | ✅ Automatic (multi-threaded) | ❌ Single-threaded by default |
+| **Query Optimization** | ✅ Built-in (lazy mode) | ❌ No optimization |
+| **Large Datasets** | ✅ Streaming support | ❌ Limited by RAM |
 
 ---
 
-## Functions
+## Features
 
 ### Expression API
 
