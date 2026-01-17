@@ -15,7 +15,7 @@
 ## 📚 Table of Contents
 
 - [What is Polars?](#what-is-polars)
-- [Feature](#functions)
+- [Features](#features)
   - [Expression API](#expression-api)
   - [Lazy Mode & Streaming](#lazy-mode--streaming)
 
@@ -32,6 +32,47 @@ Polars is a **blazingly fast** DataFrame library designed for high-performance d
   - Cache-efficient operations
   - Zero-copy data sharing with other Arrow-compatible tools (PyArrow, Spark, etc.)
   - Vectorized operations using SIMD (Single Instruction, Multiple Data)
+
+### Interoperability with PyArrow & Pandas
+
+Polars uses **Apache Arrow** as its internal memory format, enabling seamless data exchange:
+
+```text
+Polars ←→ Arrow Memory ←→ PyArrow ←→ Pandas (PyArrow-backed)
+         (Zero-copy)              (Zero-copy)
+```
+
+**Key Concepts:**
+
+- **PyArrow** - Python implementation of Apache Arrow, acts as a bridge between Polars and Pandas
+- **Zero-copy conversion** - Data is shared in memory (not duplicated) when converting between compatible formats
+- **PyArrow-backed Pandas** - Pandas DataFrames using Arrow arrays instead of NumPy arrays
+
+**Conversion Comparison:**
+
+| Method | Memory | Speed | Data Types |
+| ------ | ------ | ----- | ---------- |
+| `to_pandas()` | ❌ Copies data | Slower | NumPy types (`int64`, `object`) |
+| `to_pandas(use_pyarrow_extension_array=True)` | ✅ Zero-copy | Faster | Arrow types (`int64[pyarrow]`, `large_string[pyarrow]`) |
+
+**Example:**
+
+```python
+import polars as pl
+
+df_polars = pl.read_csv("data.csv")
+
+# Traditional conversion (copies data)
+df_pandas = df_polars.to_pandas()
+
+# Zero-copy conversion (shares memory)
+df_pandas_arrow = df_polars.to_pandas(use_pyarrow_extension_array=True)
+
+# Convert back to Polars
+df_polars_again = pl.from_pandas(df_pandas_arrow)
+```
+
+**Use Case:** Quickly switch between Polars and Pandas when you need Pandas-specific functions, without memory overhead.
 
 ### Key Features
 
