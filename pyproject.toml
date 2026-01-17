@@ -1,0 +1,24 @@
+[tool.poetry]
+package-mode = false
+
+[project]
+name = "polars_learning"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "chgwyellow",email = "dinnis1107@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "jupyter (>=1.1.1,<2.0.0)",
+    "pandas (>=2.3.3,<3.0.0)",
+    "numpy (>=2.4.1,<3.0.0)",
+    "polars (>=1.37.1,<2.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
