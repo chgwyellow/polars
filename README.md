@@ -12,6 +12,15 @@
 
 ---
 
+## 📚 Table of Contents
+
+- [What is Polars?](#what-is-polars)
+- [Functions](#functions)
+  - [Expression API](#expression-api)
+  - [Lazy Mode & Streaming](#lazy-mode--streaming)
+
+---
+
 ## What is Polars?
 
 - A `dataframe` library with a Python API.
@@ -136,8 +145,33 @@ lf.filter(pl.col("age") > 25)
   .sink_parquet("output.parquet")  # No memory overhead
 ```
 
+#### Mode Conversion Reference
+
+| Operation | Input | Output | Description |
+| --------- | ----- | ------ | ----------- |
+| `.lazy()` | DataFrame | LazyFrame | Convert to lazy mode |
+| `.collect()` | LazyFrame | DataFrame | Execute and convert to eager mode |
+
+**Common Patterns:**
+
+```python
+# Lazy → Eager
+lf = pl.scan_csv("data.csv"); df = lf.collect()
+
+# Eager → Lazy  
+df = pl.read_csv("data.csv"); lf = df.lazy()
+
+# ✅ Optimized: Preview without loading all data
+lf.head(5).collect()
+
+# ❌ Inefficient: Loads all data then converts back
+lf.collect().lazy().filter(...)
+```
+
 **Pro Tips**:
 
 - Use `pl.scan_csv()` instead of `pl.read_csv()` for automatic lazy evaluation
 - Use `.sink_*()` methods to write large results directly to disk without loading into memory
+- Do operations in Lazy mode → Only `.collect()` at the end
+- Use `.head()` before `.collect()` to preview without loading all data
 - Streaming engine was completely redesigned in Polars 1.31+ for better performance
