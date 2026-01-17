@@ -1,3 +1,5 @@
+<div align="center">
+
 # Polars Mastery Journey
 
 ![Polars](https://img.shields.io/badge/Polars-1.0+-CD792C?logo=polars&logoColor=white)
@@ -5,6 +7,8 @@
 ![Tool](https://img.shields.io/badge/Tool-Jupyter-F37626?logo=jupyter&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-In%20Progress-blue)
 ![Updated](https://img.shields.io/badge/Updated-Jan%202026-green)
+
+</div>
 
 ---
 
