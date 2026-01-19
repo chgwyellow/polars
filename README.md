@@ -17,6 +17,7 @@
 - [What is Polars?](#what-is-polars)
 - [Features](#features)
   - [Expression API](#expression-api)
+  - [Selector API](#selector-api)
   - [Lazy Mode & Streaming](#lazy-mode--streaming)
 
 ---
@@ -101,7 +102,7 @@ df_polars_again = pl.from_pandas(df_pandas_arrow)
 
 The most powerful tool in Polars.
 
-Expression API is a **declarative syntax** for data transformation that allows you to describe *what* you want to do with your data, rather than *how* to do it. 
+Expression API is a **declarative syntax** for data transformation that allows you to describe *what* you want to do with your data, rather than *how* to do it.
 
 This design enables Polars to:
 
@@ -147,6 +148,141 @@ df_with_level = df.select([
       .then(pl.lit("Senior"))
       .otherwise(pl.lit("Junior"))
       .alias("level")
+])
+```
+
+---
+
+### Selector API
+
+A **concise, semantic way to select multiple columns** using the `polars.selectors` module (commonly aliased as `cs`).
+
+Selector API complements Expression API by providing more intuitive syntax for common column selection patterns, especially when working with many columns or complex selection logic.
+
+#### Core Concept
+
+Selectors make column selection more readable and less verbose:
+
+| Task | Expression API | Selector API |
+| ---- | -------------- | ------------ |
+| All numeric columns | `pl.col([pl.Int64, pl.Float64])` | `cs.numeric()` |
+| All string columns | `pl.col(pl.Utf8)` | `cs.string()` |
+| Columns starting with "P" | `pl.col("^P.*$")` | `cs.starts_with("P")` |
+| Exclude specific columns | `pl.exclude("Age", "Fare")` | `~cs.by_name("Age", "Fare")` |
+
+#### Key Features
+
+**1. Select by Data Type**
+
+```python
+import polars.selectors as cs
+
+# All numeric columns (integers + floats)
+df.select(cs.numeric())
+
+# All string columns
+df.select(cs.string())
+```
+
+**2. Select by Name Pattern**
+
+```python
+# Columns starting with "P"
+df.select(cs.starts_with("P"))
+
+# Columns containing "age"
+df.select(cs.contains("age"))
+
+# Columns ending with "ed"
+df.select(cs.ends_with("ed"))
+
+# Regex matching (no need for ^ and $)
+df.select(cs.matches("Age|Fare"))
+```
+
+**3. Select by Position**
+
+```python
+# First column
+df.select(cs.first())
+
+# Last column
+df.select(cs.last())
+```
+
+**4. Set Operations (Most Powerful Feature)**
+
+```python
+# Intersection (&): Both conditions must be true
+df.select(cs.numeric() & cs.contains("A"))  # Numeric AND contains "A"
+
+# Union (|): At least one condition must be true
+df.select(cs.string() | cs.contains("P"))   # String OR contains "P"
+
+# Difference (-): Exclude specific columns
+df.select(cs.string() - cs.by_name("Ticket"))  # Strings except Ticket
+
+# Complement (~): Invert selection
+df.select(~cs.by_name("Age", "Fare"))  # All columns except Age and Fare
+```
+
+**5. Chain with Expressions**
+
+Selectors output standard Polars expressions, so you can chain them:
+
+```python
+# Select all columns and get max values
+df.select(cs.all().max())
+
+# Select numeric columns and calculate mean
+df.select(cs.numeric().mean())
+
+# Select columns starting with "P" and add 10
+df.select(cs.starts_with("P") + 10)
+```
+
+#### Practical Examples
+
+```python
+import polars as pl
+import polars.selectors as cs
+
+df = pl.read_csv("titanic.csv")
+
+# Select all numeric columns except PassengerId
+df.select(cs.numeric() - cs.by_name("PassengerId"))
+
+# Select columns starting with "P" OR all string columns
+df.select(cs.starts_with("P") | cs.string())
+
+# Select numeric columns that contain "a" in their name
+df.select(cs.numeric() & cs.contains("a"))
+
+# Get mean of all numeric columns
+df.select(cs.numeric().mean())
+```
+
+#### When to Use Selector API
+
+✅ **Use Selectors when:**
+
+- Selecting multiple columns by type or pattern
+- Complex column selection logic with set operations
+- Want more readable code for column selection
+
+✅ **Use Expression API when:**
+
+- Performing transformations on specific columns
+- Need fine-grained control over expressions
+- Working with single columns
+
+**Best Practice:** Combine both for maximum clarity and power!
+
+```python
+# Use selectors for column selection, expressions for transformation
+df.select([
+    cs.by_name("Name", "Age"),           # Selector for selection
+    (cs.numeric() * 2).name.suffix("_x2")  # Selector + Expression for transformation
 ])
 ```
 
