@@ -101,7 +101,9 @@ df_polars_again = pl.from_pandas(df_pandas_arrow)
 
 The most powerful tool in Polars.
 
-Expression API is a **declarative syntax** for data transformation that allows you to describe *what* you want to do with your data, rather than *how* to do it. This design enables Polars to:
+Expression API is a **declarative syntax** for data transformation that allows you to describe *what* you want to do with your data, rather than *how* to do it. 
+
+This design enables Polars to:
 
 - **Optimize query plans** - Analyze and optimize the entire operation before execution
 - **Parallelize automatically** - Distribute operations across multiple CPU cores
