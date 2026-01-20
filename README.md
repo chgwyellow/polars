@@ -153,6 +153,105 @@ df_with_level = df.select([
 
 ---
 
+### `select()` vs `with_columns()`
+
+Two fundamental methods that beginners often confuse. 
+
+Understanding their difference is crucial for effective data manipulation.
+
+#### Core Difference
+
+| Method | Behavior | Analogy |
+| ------ | -------- | ------- |
+| `select()` | **Keeps only** selected columns | Picking fruits - only take what you select |
+| `with_columns()` | **Keeps all** columns + adds/modifies | Adding toppings - keep everything + add more |
+
+#### Side-by-Side Comparison
+
+```python
+import polars as pl
+
+# Original DataFrame
+df = pl.DataFrame({
+    "a": [1, 2, 3],
+    "b": [4, 5, 6],
+    "c": [7, 8, 9]
+})
+
+# Using select() - Only keeps selected columns
+result1 = df.select(
+    pl.col("a"),
+    (pl.col("b") * 2).alias("b_doubled")
+)
+# Result: Only columns "a" and "b_doubled"
+# ❌ Column "c" is gone!
+
+# Using with_columns() - Keeps all columns
+result2 = df.with_columns(
+    (pl.col("b") * 2).alias("b_doubled")
+)
+# Result: Columns "a", "b", "c", and "b_doubled"
+# ✅ All original columns preserved!
+```
+
+#### When to Use Each
+
+**Use `select()` when:**
+
+```python
+# 1. You only need specific columns
+df.select("name", "age")
+
+# 2. Creating new computed columns (projection)
+df.select(
+    (pl.col("price") * pl.col("quantity")).alias("total")
+)
+
+# 3. Reordering columns
+df.select("id", "name", "email")  # Explicit order
+```
+
+**Use `with_columns()` when:**
+
+```python
+# 1. Adding new computed columns
+df.with_columns(
+    (pl.col("price") * 1.1).alias("price_with_tax")
+)
+
+# 2. Modifying existing columns while keeping others
+df.with_columns(
+    pl.col("date").str.to_datetime(),  # Convert date
+    pl.col("amount").cast(pl.Float64)   # Cast amount
+)
+
+# 3. Batch transformations
+df.with_columns(
+    pl.all().fill_null(0)  # Fill nulls in all columns
+)
+```
+
+#### Quick Decision Rule
+
+Ask yourself: **"Do I need to keep other columns?"**
+
+- ✅ **Yes** → Use `with_columns()`
+- ❌ **No** → Use `select()`
+
+#### Common Pattern: Combine Both
+
+```python
+# First add computed columns, then select what you need
+df.with_columns(
+    (pl.col("a") + pl.col("b")).alias("sum"),
+    (pl.col("a") * pl.col("b")).alias("product")
+).select(
+    "sum", "product", "c"  # Only keep these
+)
+```
+
+---
+
 ### Selector API
 
 A **concise, semantic way to select multiple columns** using the `polars.selectors` module (commonly aliased as `cs`).
