@@ -19,6 +19,7 @@
   - [Expression API](#expression-api)
   - [Selector API](#selector-api)
   - [Lazy Mode & Streaming](#lazy-mode--streaming)
+  - [Parquet File Format](#parquet-file-format)
 
 ---
 
@@ -155,7 +156,7 @@ df_with_level = df.select([
 
 ### `select()` vs `with_columns()`
 
-Two fundamental methods that beginners often confuse. 
+Two fundamental methods that beginners often confuse.
 
 Understanding their difference is crucial for effective data manipulation.
 
@@ -476,3 +477,198 @@ lf.collect().lazy().filter(...)
 - Do operations in Lazy mode → Only `.collect()` at the end
 - Use `.head()` before `.collect()` to preview without loading all data
 - Streaming engine was completely redesigned in Polars 1.31+ for better performance
+
+---
+
+### Parquet File Format
+
+**Parquet** is a **columnar binary file format** that has become the de facto standard for data analytics and big data processing. It's one of the most important file formats to understand when working with Polars.
+
+#### Why Parquet?
+
+Beyond being compact and fast, Parquet offers several critical advantages:
+
+| Feature | Parquet | CSV |
+| ------- | ------- | --- |
+| **Storage Type** | Columnar (binary) | Row-based (text) |
+| **File Size** | 🟢 Small (compressed) | 🔴 Large (uncompressed text) |
+| **Read Speed** | 🟢 Very Fast | 🟡 Moderate |
+| **Write Speed** | 🟢 Fast | 🟢 Fast |
+| **Schema Preservation** | ✅ Yes (embedded metadata) | ❌ No (inferred on read) |
+| **Data Types** | ✅ Rich types (nested, complex) | ❌ Limited (strings/numbers) |
+| **Compression** | ✅ Built-in (Snappy, GZIP, ZSTD) | ❌ None (external only) |
+| **Partial Reading** | ✅ Column pruning | ❌ Must read all columns |
+| **Query Optimization** | ✅ Predicate pushdown | ❌ No optimization |
+
+#### Core Features
+
+**1. Columnar Storage**
+
+- Data is stored by column, not by row
+- Enables reading only the columns you need (column pruning)
+- Perfect for analytical queries that typically access a subset of columns
+
+**2. Built-in Compression**
+
+- Supports multiple compression algorithms: Snappy (default), GZIP, LZO, Brotli, ZSTD
+- Columnar layout improves compression ratios (similar data types compress better)
+- Typical compression: 5-10x smaller than CSV
+
+**3. Schema Evolution**
+
+- Schema is embedded in the file (no need to specify data types on read)
+- Supports adding, removing, or modifying columns over time
+- Backward and forward compatibility
+
+**4. Complex Data Types**
+
+- Supports nested structures: arrays, maps, structs
+- Can represent hierarchical data without flattening
+
+**5. Data Partitioning**
+
+- Organize data into directories by column values (e.g., `year=2024/month=01/`)
+- Query only relevant partitions for massive speedups
+
+**6. Statistics & Indexing**
+
+- Stores min/max/null count for each column chunk
+- Enables **predicate pushdown**: filter data during file reading, not after
+- Skip entire row groups that don't match filter conditions
+
+**7. Cross-Language Support**
+
+- Apache project with standardized format
+- Works seamlessly across Python, Java, C++, R, Rust, etc.
+
+#### Parquet in Polars
+
+Parquet is a **first-class citizen** in Polars. The columnar storage format aligns perfectly with Polars' columnar processing engine.
+
+**Basic Usage:**
+
+```python
+import polars as pl
+
+# Write DataFrame to Parquet
+df.write_parquet("data.parquet")
+
+# Read Parquet file (eager mode)
+df = pl.read_parquet("data.parquet")
+
+# Read Parquet file (lazy mode) - RECOMMENDED
+lf = pl.scan_parquet("data.parquet")
+result = lf.filter(pl.col("age") > 30).collect()
+```
+
+**Advanced Features:**
+
+```python
+# 1. Compression options
+df.write_parquet("data.parquet", compression="zstd")  # Better compression
+df.write_parquet("data.parquet", compression="snappy")  # Faster (default)
+
+# 2. Predicate pushdown (filter during read)
+# Only reads rows where age > 30 - MUCH faster!
+df = pl.scan_parquet("data.parquet") \
+       .filter(pl.col("age") > 30) \
+       .collect()
+
+# 3. Column pruning (read only specific columns)
+# Only reads "name" and "age" columns - saves memory!
+df = pl.scan_parquet("data.parquet") \
+       .select(["name", "age"]) \
+       .collect()
+
+# 4. Partitioned datasets
+# Write partitioned by year and month
+df.write_parquet("data", partition_by=["year", "month"])
+
+# Read partitioned dataset (auto-discovers partitions)
+df = pl.scan_parquet("data/**/*.parquet").collect()
+
+# 5. Streaming for large files
+lf = pl.scan_parquet("huge_file.parquet")
+result = lf.filter(pl.col("revenue") > 1000) \
+           .group_by("country") \
+           .agg(pl.col("revenue").sum()) \
+           .collect(streaming=True)  # Process in batches
+```
+
+#### Parquet in PySpark
+
+Parquet is also the **recommended default format** in PySpark:
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("example").getOrCreate()
+
+# Write DataFrame to Parquet
+df.write.parquet("data.parquet")
+
+# Read Parquet file
+df = spark.read.parquet("data.parquet")
+
+# Partitioned write (common pattern in data lakes)
+df.write.partitionBy("year", "month").parquet("partitioned_data")
+
+# Predicate pushdown (automatic in Spark)
+df = spark.read.parquet("data.parquet") \
+          .filter("age > 30")  # Filter pushed to file read
+```
+
+#### When to Use Parquet
+
+✅ **Use Parquet when:**
+
+- Working with analytical workloads (read-heavy, column-focused queries)
+- Need to store data long-term (schema preservation)
+- File size matters (compression)
+- Working with Polars, Spark, or other big data tools
+- Need fast query performance on large datasets
+- Want to leverage predicate pushdown and column pruning
+
+❌ **Use CSV when:**
+
+- Need human-readable format for debugging
+- Sharing data with non-technical users
+- Working with simple, small datasets
+- Need maximum compatibility with legacy systems
+
+#### Best Practices
+
+1. **Always use `scan_parquet()` instead of `read_parquet()`** for lazy evaluation
+2. **Apply filters early** to leverage predicate pushdown
+3. **Select only needed columns** to benefit from column pruning
+4. **Use partitioning** for large datasets organized by time or category
+5. **Choose compression wisely**:
+   - `snappy` (default): Balanced speed and compression
+   - `zstd`: Best compression ratio, slightly slower
+   - `gzip`: Good compression, slower than snappy
+6. **Use streaming mode** for files larger than RAM
+
+#### Real-World Example
+
+```python
+import polars as pl
+
+# ❌ Inefficient: Eager read, loads everything
+df = pl.read_parquet("sales_100GB.parquet")
+result = df.filter(pl.col("year") == 2024) \
+           .select(["product", "revenue"]) \
+           .group_by("product") \
+           .agg(pl.col("revenue").sum())
+
+# ✅ Efficient: Lazy + predicate pushdown + column pruning
+result = pl.scan_parquet("sales_100GB.parquet") \
+           .filter(pl.col("year") == 2024)  # Pushed to file read
+           .select(["product", "revenue"])   # Only reads these columns
+           .group_by("product") \
+           .agg(pl.col("revenue").sum()) \
+           .collect(streaming=True)  # Batch processing
+```
+
+**Performance difference:** The efficient version can be **10-100x faster** and use **90% less memory**!
+
+---
