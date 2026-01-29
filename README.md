@@ -2,8 +2,8 @@
 
 # Polars Mastery Journey
 
-![Polars](https://img.shields.io/badge/Polars-1.0+-CD792C?logo=polars&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)
+![Polars](https://img.shields.io/badge/Polars-1.37+-CD792C?logo=polars&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)
 ![Tool](https://img.shields.io/badge/Tool-Jupyter-F37626?logo=jupyter&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-In%20Progress-blue)
 ![Updated](https://img.shields.io/badge/Updated-Jan%202026-green)
@@ -17,6 +17,8 @@
 - [What is Polars?](#what-is-polars)
 - [Features](#features)
   - [Expression API](#expression-api)
+  - [`select()` vs `with_columns()`](#select-vs-with_columns)
+  - [`group_by()` vs `group_by_dynamic()`](#group_by-vs-group_by_dynamic)
   - [Selector API](#selector-api)
   - [Lazy Mode & Streaming](#lazy-mode--streaming)
   - [Parquet File Format](#parquet-file-format)
@@ -250,6 +252,156 @@ df.with_columns(
     "sum", "product", "c"  # Only keep these
 )
 ```
+
+---
+
+### `group_by()` vs `group_by_dynamic()`
+
+Two methods for grouping data that serve different purposes.
+
+Understanding when to use each is crucial for efficient time series analysis.
+
+#### Core Difference
+
+| Method | Purpose | Best For |
+| ------ | ------- | -------- |
+| `group_by()` | General-purpose grouping | Any grouping operation |
+| `group_by_dynamic()` | **Time series grouping** | Fixed time interval windows |
+
+#### Key Distinctions
+
+| Feature | `group_by()` | `group_by_dynamic()` |
+| ------- | ------------ | -------------------- |
+| **Use Case** | General grouping | Time-based windowing |
+| **Time Handling** | Manual extraction (`.dt.date()`) | Automatic window creation |
+| **Sorting Requirement** | ❌ None | ✅ **Must be sorted ascending** |
+| **Syntax** | More verbose for time | Concise with `every` parameter |
+| **Performance** | Standard | Optimized for sorted time data |
+| **Window Intervals** | Manual definition | Built-in (`"1d"`, `"3h"`, `"6h"`) |
+
+#### Side-by-Side Comparison
+
+```python
+import polars as pl
+
+df = pl.read_csv("trips.csv", try_parse_dates=True)
+
+# ─────────────────────────────────────────────────────────
+# Using group_by() - Manual time extraction
+# ─────────────────────────────────────────────────────────
+result1 = df.group_by(
+    pl.col("pickup").dt.date().alias("date")  # Extract date component
+).agg(
+    pl.col("trip_distance").mean().round(1)
+).sort("date")  # Manual sorting
+
+# ─────────────────────────────────────────────────────────
+# Using group_by_dynamic() - Automatic windowing
+# ─────────────────────────────────────────────────────────
+result2 = df.group_by_dynamic(
+    "pickup",      # Time column (must be sorted!)
+    every="1d"     # Window size: 1 day
+).agg(
+    pl.col("trip_distance").mean().round(1)
+)  # Already sorted by time
+```
+
+#### Critical Requirement for `group_by_dynamic()`
+
+⚠️ **The time column MUST be sorted in ascending order:**
+
+```python
+# Check if sorted
+df["pickup"].is_sorted()  # Must return True
+
+# If not sorted, sort first
+df = df.sort("pickup")
+
+# Or mark as sorted (if you know it's already sorted)
+df = df.with_columns(pl.col("pickup").set_sorted())
+```
+
+#### Flexible Time Intervals
+
+`group_by_dynamic()` supports intuitive interval strings:
+
+```python
+# Hourly windows
+df.group_by_dynamic("pickup", every="1h")
+
+# 6-hour windows
+df.group_by_dynamic("pickup", every="6h")
+
+# Daily windows
+df.group_by_dynamic("pickup", every="1d")
+
+# Weekly windows
+df.group_by_dynamic("pickup", every="1w")
+
+# Monthly windows
+df.group_by_dynamic("pickup", every="1mo")
+```
+
+#### Combining with Regular Grouping
+
+You can group by other columns **before** applying dynamic time windows:
+
+```python
+# Group by VendorID, then apply 3-hour windows
+df.sort("VendorID", "pickup").group_by_dynamic(
+    "pickup",
+    every="3h",
+    group_by="VendorID"  # First group by this column
+).agg(
+    pl.col("tip_amount").mean().round(1)
+)
+```
+
+#### When to Use Each
+
+**Use `group_by()` when:**
+
+```python
+# 1. Grouping by non-time columns
+df.group_by("category").agg(pl.col("sales").sum())
+
+# 2. Grouping by multiple non-time columns
+df.group_by(["region", "product"]).agg(pl.col("revenue").mean())
+
+# 3. Custom time grouping (not fixed intervals)
+df.group_by(
+    pl.col("date").dt.year(),
+    pl.col("date").dt.quarter()
+).agg(pl.col("sales").sum())
+```
+
+**Use `group_by_dynamic()` when:**
+
+```python
+# 1. Fixed time interval windows
+df.group_by_dynamic("timestamp", every="1h")
+
+# 2. Time series resampling
+df.group_by_dynamic("date", every="1w").agg(pl.col("value").mean())
+
+# 3. Rolling time windows with grouping
+df.group_by_dynamic(
+    "timestamp",
+    every="5min",
+    group_by="sensor_id"
+)
+```
+
+#### Quick Decision Rule
+
+Ask yourself: **"Am I grouping by fixed time intervals?"**
+
+- ✅ **Yes** → Use `group_by_dynamic()` (faster, cleaner)
+- ❌ **No** → Use `group_by()` (more flexible)
+
+#### Performance Note
+
+`group_by_dynamic()` uses a fast-track algorithm that requires sorted data. For large time series datasets, it's significantly faster than manually extracting time components with `group_by()`.
 
 ---
 
